@@ -29,13 +29,15 @@ based on an internal look-up table generated from a public NASA source. No
 network connection is needed.
 """
 
-import gtk
-import gobject
-from sugar.activity import activity
-from sugar.graphics.toggletoolbutton import ToggleToolButton
-from sugar.graphics.toolbutton import ToolButton
-from sugar import profile
-from sugar.datastore import datastore
+from gi.repository import GObject
+from gi.repository import Gdk
+from gi.repository import GdkPixbuf
+from gi.repository import Gtk
+from sugar3.activity import activity
+from sugar3.graphics.toggletoolbutton import ToggleToolButton
+from sugar3.graphics.toolbutton import ToolButton
+from sugar3 import profile
+from sugar3.datastore import datastore
 from gettext import gettext as _
 import math
 import time
@@ -49,9 +51,9 @@ except (ImportError, AttributeError):
 
 try:
     # >= 0.86 toolbars
-    from sugar.graphics.toolbarbox import ToolbarButton, ToolbarBox
-    from sugar.activity.widgets import ActivityToolbarButton
-    from sugar.activity.widgets import StopButton
+    from sugar3.graphics.toolbarbox import ToolbarButton, ToolbarBox
+    from sugar3.activity.widgets import ActivityToolbarButton
+    from sugar3.activity.widgets import StopButton
 except ImportError:
     # <= 0.84 toolbars
     pass
@@ -71,10 +73,6 @@ class MoonActivity(activity.Activity):
         self.set_title(_("Moon"))
         
         # Defaults (Resume priority, persistent file secondary, fall-back hardcoded)
-        if handle.object_id == None:
-            print "Launched from home."
-        else:
-            print "Journal resume."
         self.hemisphere_view = 'north'
         self.show_grid = False
         self.activity_state = {}
@@ -89,7 +87,7 @@ class MoonActivity(activity.Activity):
             toolbar_box = ToolbarBox()
             activity_button = ActivityToolbarButton(self)
             toolbar_box.toolbar.insert(activity_button, 0)
-            separator = gtk.SeparatorToolItem()
+            separator = Gtk.SeparatorToolItem()
             toolbar_box.toolbar.insert(separator, -1)
             self.toggle_grid_button = ToggleToolButton('grid-icon')
             self.toggle_grid_button.set_tooltip(_("Toggle Grid View"))
@@ -110,7 +108,7 @@ class MoonActivity(activity.Activity):
             toolbar_box.toolbar.insert(self.image_button, -1)
             self.image_button.show()
 
-            separator = gtk.SeparatorToolItem()
+            separator = Gtk.SeparatorToolItem()
             separator.props.draw = False
             separator.set_expand(True)
             separator.show()
@@ -118,13 +116,13 @@ class MoonActivity(activity.Activity):
 
             tool = StopButton(self)
             toolbar_box.toolbar.insert(tool, -1)
-            self.set_toolbox(toolbar_box)
+            self.set_toolbar_box(toolbar_box)
             toolbar_box.show()
 
         except NameError:
             # Use old <= 0.84 toolbar design
             toolbox = activity.ActivityToolbox(self)
-            view_tool_bar = gtk.Toolbar()
+            view_tool_bar = Gtk.Toolbar()
             self.toggle_grid_button = ToggleToolButton('grid-icon')
             self.toggle_grid_button.set_tooltip(_("Toggle Grid View"))
             self.toggle_grid_button.set_active(self.show_grid)
@@ -152,60 +150,73 @@ class MoonActivity(activity.Activity):
             activity_toolbar.share.props.visible = False
 
         # Items we don't have to do every redraw
-        colormap = gtk.gdk.colormap_get_system()
-        self.black_alloc_color = colormap.alloc_color('black')
-        self.white_alloc_color = colormap.alloc_color('white')
-        self.blue_green_mask_alloc_color = colormap.alloc_color('#F00')
-        self.red_alloc_color = colormap.alloc_color('#F20')
-        self.blue_alloc_color = colormap.alloc_color('#04F')
-        self.moon_stamp = gtk.gdk.pixbuf_new_from_file("moon.jpg")
+        def cp(colour):
+            rgba = Gdk.RGBA()
+            rgba.parse(colour)
+            return rgba.to_color()
+
+        self.black_alloc_color = cp('black')
+        self.white_alloc_color = cp('white')
+        self.blue_green_mask_alloc_color = cp('#F00')
+        self.red_alloc_color = cp('#F20')
+        self.blue_alloc_color = cp('#04F')
+        self.moon_stamp = GdkPixbuf.Pixbuf.new_from_file("moon.jpg")
         self.image_size_cache = -1
 
         # Build main layout manually for the first pass
         self.build_main_layout_cb()
 
         # Watch for signal that the screen changed size (landscape vs. portrait)
-        gtk.gdk.screen_get_default().connect('size-changed', self.build_main_layout_cb)
+        Gdk.Screen.get_default().connect('size-changed', self.build_main_layout_cb)
+
+        # testing restarter
+        ct = os.stat('go').st_ctime
+        def restarter():
+            if os.stat('go').st_ctime != ct:
+                self.close()
+                return False
+            return True
+        GObject.timeout_add(233, restarter)
 
     def build_main_layout_cb(self, widget=None, data=None):
         """Create main layout respecting landscape or portrait orientation.
         """
 
         # Create event box to hold Moon image (so I can set background color)
-        info_scroll = gtk.ScrolledWindow()
-        self.event_box = gtk.EventBox()
+        info_scroll = Gtk.ScrolledWindow()
+        self.event_box = Gtk.EventBox()
 
         # Create the main activity layout
         if self.is_landscape_orientation():
-            self.main_view = gtk.HBox()
-            self.info_panel = gtk.VBox()
-            self.event_box.set_size_request(int(gtk.gdk.screen_width() / 1.70), -1)
-            self.main_view.pack_end(self.event_box, False)
-            self.main_view.pack_start(info_scroll, True)
+            self.main_view = Gtk.HBox()
+            self.info_panel = Gtk.VBox()
+            self.event_box.set_size_request(int(Gdk.Screen.width() / 1.70), -1)
+            self.main_view.pack_end(self.event_box, False, False, 0)
+            self.main_view.pack_start(info_scroll, True, True, 0)
         else:
-            self.main_view = gtk.VBox()
-            self.info_panel = gtk.HBox()
-            self.event_box.set_size_request(-1, int(gtk.gdk.screen_height() / 1.60))
-            self.main_view.pack_start(self.event_box, False)
-            self.main_view.pack_start(info_scroll, True)
+            self.main_view = Gtk.VBox()
+            self.info_panel = Gtk.HBox()
+            self.event_box.set_size_request(-1, int(Gdk.Screen.height() / 1.60))
+            self.main_view.pack_start(self.event_box, False, False, 0)
+            self.main_view.pack_start(info_scroll, True, True, 0)
 
         # Create the Moon image widget
-        self.image = gtk.Image()
+        self.image = Gtk.Image()
         self.event_box.add(self.image)
-        self.event_box.modify_bg(gtk.STATE_NORMAL, self.black_alloc_color)
+        self.event_box.modify_bg(Gtk.StateType.NORMAL, self.black_alloc_color)
         self.event_box.connect('size-allocate', self._moon_size_allocate_cb)
 
         # Create scrolling Moon information panel
-        info_scroll.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
+        info_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         info_scroll.set_size_request(-1, -1)
 
         self.info_panel.set_border_width(10)
-        self.info = gtk.Label()
-        self.info.set_justify(gtk.JUSTIFY_LEFT)
+        self.info = Gtk.Label()
+        self.info.set_justify(Gtk.Justification.LEFT)
         self.info.set_alignment(0.0, 0.0)
-        self.info_panel.pack_start(self.info, False)
-        self.info2 = gtk.Label()
-        self.info2.set_justify(gtk.JUSTIFY_LEFT)
+        self.info_panel.pack_start(self.info, False, False, 0)
+        self.info2 = Gtk.Label()
+        self.info2.set_justify(Gtk.Justification.LEFT)
         self.info2.set_alignment(0.0, 0.0)
         self.info_panel.pack_start(self.info2, True, True, 10)
         info_scroll.add_with_viewport(self.info_panel)
@@ -229,7 +240,7 @@ class MoonActivity(activity.Activity):
     def is_landscape_orientation(self):
         """Return True of in landscape, False for portrait orientation.
         """
-        if gtk.gdk.screen_width() > gtk.gdk.screen_height():
+        if Gdk.Screen.width() > Gdk.Screen.height():
             return True
         return False
 
@@ -278,7 +289,7 @@ class MoonActivity(activity.Activity):
             self.show_grid = False
         else:
             self.show_grid = True
-        gobject.source_remove(self.update_moon_image_timeout)
+        GObject.source_remove(self.update_moon_image_timeout)
         self.update_moon_image_view()
 
     def toggle_hemisphere_clicked(self, widget):
@@ -288,7 +299,7 @@ class MoonActivity(activity.Activity):
             self.hemisphere_view = 'south'
         else:
             self.hemisphere_view = 'north'
-        gobject.source_remove(self.update_moon_image_timeout)
+        GObject.source_remove(self.update_moon_image_timeout)
         self.update_moon_image_view()
 
     def update_text_information_view(self):
@@ -313,7 +324,7 @@ class MoonActivity(activity.Activity):
 
         # Calculate time to next minute cusp and set a new timer
         ms_to_next_min_cusp = (60 - time.gmtime()[5]) * 1000
-        gobject.timeout_add(ms_to_next_min_cusp, self.update_text_information_view)
+        GObject.timeout_add(ms_to_next_min_cusp, self.update_text_information_view)
 
         # Stop this timer running
         return False
@@ -321,7 +332,8 @@ class MoonActivity(activity.Activity):
     def update_moon_image_view(self):
         """Update Moon image view using last cached Moon data.
         """
-        self.image_pixmap = gtk.gdk.Pixmap(self.window, IMAGE_SIZE, IMAGE_SIZE)
+        pass
+        self.image_pixmap = Gdk.Pixmap(self.window, IMAGE_SIZE, IMAGE_SIZE)
         self.gc = self.image_pixmap.new_gc(foreground=self.black_alloc_color)
         self.image.set_from_pixmap(self.image_pixmap, None)
 
@@ -329,7 +341,7 @@ class MoonActivity(activity.Activity):
         self.image_pixmap.draw_rectangle(self.gc, True, 0, 0, IMAGE_SIZE, IMAGE_SIZE)
                 
         # Create a 1bit shadow mask
-        mask_pixmap = gtk.gdk.Pixmap(None, IMAGE_SIZE, IMAGE_SIZE, depth=1)
+        mask_pixmap = Gdk.Pixmap(None, IMAGE_SIZE, IMAGE_SIZE, depth=1)
         kgc = mask_pixmap.new_gc(foreground=self.black_alloc_color)
         wgc = mask_pixmap.new_gc(foreground=self.white_alloc_color)
         mask_pixmap.draw_rectangle(kgc, True, 0, 0, IMAGE_SIZE, IMAGE_SIZE)
@@ -361,14 +373,14 @@ class MoonActivity(activity.Activity):
         
         # Modified image based on public domain photo by John MacCooey
         moon_pixbuf = self.moon_stamp.scale_simple(IMAGE_SIZE, IMAGE_SIZE,
-                gtk.gdk.INTERP_BILINEAR)
+                GdkPixbuf.InterpType.BILINEAR)
 
         # Composite bright Moon image and semi-transparant Moon for shadow detail
-        dark_pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8, IMAGE_SIZE, IMAGE_SIZE)
+        dark_pixbuf = GdkPixbuf.Pixbuf(GdkPixbuf.Colorspace.RGB, True, 8, IMAGE_SIZE, IMAGE_SIZE)
         dark_pixbuf.fill(0x00000000)
         if (self.data_model.next_lunar_eclipse_sec == -1 and self.data_model.last_lunar_eclipse_sec > 7200) or (self.data_model.next_lunar_eclipse_sec > 7200 and self.data_model.last_lunar_eclipse_sec == -1) or min(self.data_model.next_lunar_eclipse_sec, self.data_model.last_lunar_eclipse_sec) > 7200:
             # Normal Moon phase render
-            moon_pixbuf.composite(dark_pixbuf, 0, 0, IMAGE_SIZE, IMAGE_SIZE, 0, 0, 1, 1, gtk.gdk.INTERP_BILINEAR, 127)
+            moon_pixbuf.composite(dark_pixbuf, 0, 0, IMAGE_SIZE, IMAGE_SIZE, 0, 0, 1, 1, GdkPixbuf.InterpType.BILINEAR, 127)
             self.image_pixmap.draw_pixbuf(self.gc, dark_pixbuf, 0, 0, 0, 0)
             self.image_pixmap.draw_pixbuf(maskgc, moon_pixbuf, 0, 0, 0, 0)
 
@@ -381,23 +393,23 @@ class MoonActivity(activity.Activity):
             else:
                 eclipse_alpha = min(self.data_model.next_lunar_eclipse_sec, self.data_model.last_lunar_eclipse_sec) / 7200.0 * 256
             moon_pixbuf.composite(dark_pixbuf, 0, 0, IMAGE_SIZE, IMAGE_SIZE,
-                                  0, 0, 1, 1, gtk.gdk.INTERP_BILINEAR,
+                                  0, 0, 1, 1, GdkPixbuf.InterpType.BILINEAR,
                                   int(196 - eclipse_alpha / 2))
             self.image_pixmap.draw_pixbuf(self.gc, dark_pixbuf, 0, 0, 0, 0)
             del dark_pixbuf
-            dark_pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8, IMAGE_SIZE, IMAGE_SIZE)
+            dark_pixbuf = GdkPixbuf.Pixbuf(GdkPixbuf.Colorspace.RGB, True, 8, IMAGE_SIZE, IMAGE_SIZE)
             moon_pixbuf.composite(dark_pixbuf, 0, 0, IMAGE_SIZE, IMAGE_SIZE,
-                                  0, 0, 1, 1, gtk.gdk.INTERP_BILINEAR,
+                                  0, 0, 1, 1, GdkPixbuf.InterpType.BILINEAR,
                                   int(eclipse_alpha))
-            rgc = self.image_pixmap.new_gc(foreground=self.blue_green_mask_alloc_color, function=gtk.gdk.AND)
+            rgc = self.image_pixmap.new_gc(foreground=self.blue_green_mask_alloc_color, function=Gdk.AND)
             self.image_pixmap.draw_rectangle(rgc, True, 0, 0, IMAGE_SIZE, IMAGE_SIZE)
             self.image_pixmap.draw_pixbuf(self.gc, dark_pixbuf, 0, 0, 0, 0)
 
         if self.hemisphere_view == 'south':
             # Rotate final image for a view from north or south hemisphere
-            rot_pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, IMAGE_SIZE, IMAGE_SIZE)
+            rot_pixbuf = GdkPixbuf.Pixbuf(GdkPixbuf.Colorspace.RGB, False, 8, IMAGE_SIZE, IMAGE_SIZE)
             rot_pixbuf.get_from_drawable(self.image_pixmap, self.image_pixmap.get_colormap(), 0, 0, 0, 0, -1, -1)
-            rot_pixbuf = rot_pixbuf.rotate_simple(gtk.gdk.PIXBUF_ROTATE_UPSIDEDOWN)
+            rot_pixbuf = rot_pixbuf.rotate_simple(Gdk.PIXBUF_ROTATE_UPSIDEDOWN)
             self.image_pixmap.draw_pixbuf(self.gc, rot_pixbuf, 0, 0, 0, 0)
             if self.show_grid:
                 # Draw grid rotated for south hemi
@@ -409,7 +421,7 @@ class MoonActivity(activity.Activity):
         self.image.queue_draw()
 
         # Update the Moon image in another 5min
-        self.update_moon_image_timeout = gobject.timeout_add(300000, self.update_moon_image_view)
+        self.update_moon_image_timeout = GObject.timeout_add(300000, self.update_moon_image_view)
         
         # Stop this timer running
         return False
@@ -492,7 +504,7 @@ class MoonActivity(activity.Activity):
         """
 
         w, h = self.get_size()
-        pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8,
+        pixbuf = GdkPixbuf.Pixbuf(GdkPixbuf.Colorspace.RGB, False, 8,
                     int(w / 1.70), h - 55)
 
         shot = pixbuf.get_from_drawable(self.window, self.get_colormap(),
@@ -514,7 +526,7 @@ class MoonActivity(activity.Activity):
         # Alert
         HAS_ALERT = False
         try:
-            from sugar.graphics.alert import NotifyAlert
+            from sugar3.graphics.alert import NotifyAlert
             HAS_ALERT = True
         except:
             pass
